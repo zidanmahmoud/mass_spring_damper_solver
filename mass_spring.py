@@ -210,27 +210,32 @@ class MassSpringDamper(MassSpring):
 
 if __name__ == "__main__":
     # == Static Spring
-    system = StaticSpring(5)
-    system.set_external_force(lambda t: 10)
-    system.solve()
-    print(f"x = {system.position[0]}")
+    SYSTEM = StaticSpring(5)
+    SYSTEM.set_external_force(lambda t: 10)
+    SYSTEM.solve()
+    print(f"x = {SYSTEM.position[0]}")
 
     # == Undamped dynamic spring-mass system
-    system = MassSpring(1, 1, 0.05)
-    system.set_external_force(0)
-    system.set_initial_conditions(-5, 10)
-    system.solve(50)
+    SYSTEM = MassSpring(1, 1, 0.05)
+    SYSTEM.set_external_force(0)
+    SYSTEM.set_initial_conditions(-5, 10)
+    SYSTEM.solve(50)
     plt.figure()
-    plt.plot(np.linspace(0, 10, num=len(system.position)), system.position)
+    plt.plot(np.linspace(0, 10, num=len(SYSTEM.position)), SYSTEM.position)
     plt.grid()
 
     # == Damped dynamic spring-mass system
-    system = MassSpringDamper(1, 0.03, lambda x: 1*sin(x), 0.05)
-    system.set_external_force(lambda t: 3 * cos(4 * t))
-    system.set_initial_conditions(1, 0)
-    system.solve(60)
+    SYSTEM = MassSpringDamper(1, 0.03, lambda x: 1 * sin(x), 0.05)
+    SYSTEM.set_external_force(lambda t: 3 * cos(4 * t))
+    SYSTEM.set_initial_conditions(1, 0)
+    SYSTEM.solve(60)
     plt.figure()
-    plt.plot(np.linspace(0, 60, num=len(system.position)), system.position)
+    plt.plot(np.linspace(0, 60, num=len(SYSTEM.position)), SYSTEM.position)
     plt.grid()
+    plt.xlabel("time")
+    plt.ylabel("displacement")
+    TITLE = "Dynamic Damped spring mass system\n"
+    TITLE += r"$M=1,~C=0.03,~K=\sin(x),~F=3\cos(x),~x_0=1,v_0=0$"
+    plt.title(TITLE)
 
     plt.show()
