@@ -1,9 +1,11 @@
 """
 Explicit Solvers for static and dynamic spring systems
 """
+import time
 import numpy as np
 import matplotlib.pyplot as plt
 from math import sin, cos, pi
+from spring import spring
 
 
 class StaticSpring:
@@ -35,9 +37,9 @@ class StaticSpring:
         else:
             self._f_ext = float(external_force)
 
-    def _get_external_force(self, time):
+    def _get_external_force(self, time_):
         if callable(self._f_ext):
-            return self._f_ext(time)
+            return self._f_ext(time_)
         return self._f_ext
 
     def _get_internal_force(self, displacement):
@@ -78,9 +80,9 @@ class DynamicSpring:
         self._dt = float(dt)
 
         self._f_ext = 0
-        self._xm = 0
+        self._vm = 0
+        self._vp = 0
         self._xi = 0
-        self._xp = 0
 
         self.position = []
 
@@ -109,11 +111,11 @@ class DynamicSpring:
         init_vel : float
         """
         self._xi = init_disp
-        self._xm = init_disp - self._dt * init_vel
+        self._vm = init_vel
 
-    def _get_external_force(self, time):
+    def _get_external_force(self, time_):
         if callable(self._f_ext):
-            return self._f_ext(time)
+            return self._f_ext(time_)
         return self._f_ext
 
     def _get_internal_force(self, disp):
@@ -124,7 +126,7 @@ class DynamicSpring:
     def _get_lhs(self):
         raise NotImplementedError("Base Class!")
 
-    def _get_rhs(self, time):
+    def _get_rhs(self, time_):
         raise NotImplementedError("Base Class!")
 
     def solve(self, end_time):
@@ -142,11 +144,11 @@ class DynamicSpring:
             curr_time += self._dt
             lhs = self._get_lhs()
             rhs = self._get_rhs(curr_time - self._dt)
-            disp = rhs / lhs
-            self._xp = disp
-            self._xm = self._xi
-            self._xi = self._xp
-            self.position.append(disp)
+            acceleration = rhs / lhs
+            self._vp = self._vm + self._dt * acceleration
+            self._xi += self._dt * self._vp
+            self.position.append(self._xi)
+            self._vm = self._vp
 
 
 class MassSpring(DynamicSpring):
@@ -164,13 +166,12 @@ class MassSpring(DynamicSpring):
     """
 
     def _get_lhs(self):
-        return self._m / self._dt ** 2
+        return self._m
 
-    def _get_rhs(self, time):
-        ext_force = self._get_external_force(time - self._dt)
+    def _get_rhs(self, time_):
+        ext_force = self._get_external_force(time_ - self._dt)
         int_force = self._get_internal_force(self._xi)
-        mass_term = self._m / self._dt ** 2
-        rhs = ext_force - int_force + mass_term * (2 * self._xi - self._xm)
+        rhs = ext_force - int_force
         return rhs
 
 
@@ -194,17 +195,9 @@ class MassSpringDamper(MassSpring):
         super().__init__(m, k, dt)
         self._c = float(c)
 
-    def _get_rhs(self, time):
-        ext_force = self._get_external_force(time - self._dt)
-        int_force = self._get_internal_force(self._xi)
-        mass_term = self._m / self._dt ** 2
-        damp_term = self._c / (self._dt)
-        rhs = (
-            ext_force
-            - int_force
-            + mass_term * (2 * self._xi - self._xm)
-            - damp_term * (self._xi - self._xm)
-        )
+    def _get_rhs(self, time_):
+        rhs = super()._get_rhs(time_)
+        rhs -= self._c * self._vm
         return rhs
 
 
@@ -238,4 +231,18 @@ if __name__ == "__main__":
     TITLE += r"$M=1,~C=0.03,~K=\sin(x),~F=3\cos(x),~x_0=1,v_0=0$"
     plt.title(TITLE)
 
+    plt.show()
+
+    fig, ax = plt.subplots()
+    (line,) = ax.plot([], [], c="black")
+    mass = ax.scatter([0], [0], s=750, c="black")
+    ax.set(xlim=[-1.5, 2.5], ylim=[-1.0, 1.0])
+    plt.axis("off")
+    for deformation in SYSTEM.position:
+        coords = spring([0, 0], [1 + deformation, 0], 12, 0.5)
+        line.set_xdata(coords[0])
+        line.set_ydata(coords[1])
+        mass.set_offsets([1.0 + deformation, 0])
+        plt.pause(0.00000001)
+    ax.set_aspect("equal", "box")
     plt.show()
