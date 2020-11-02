@@ -1,10 +1,9 @@
 """
 Explicit Solvers for static and dynamic spring systems
 """
-import time
+from math import sin, cos, pi, sqrt
 import numpy as np
 import matplotlib.pyplot as plt
-from math import sin, cos, pi
 from spring import spring
 
 
@@ -80,11 +79,23 @@ class DynamicSpring:
         self._dt = float(dt)
 
         self._f_ext = 0
-        self._vm = 0
-        self._vp = 0
-        self._xi = 0
 
-        self.position = []
+        self._prev_vel = 0
+        self._prev_mid_vel = 0
+        self._mid_vel = 0
+        self._vel = 0
+
+        self._def = 0
+        self._prev_def = 0
+
+        self._displacement = []
+
+    @property
+    def deformation(self):
+        """
+        deformation as a numpy array
+        """
+        return np.asarray(self._displacement)
 
     def set_external_force(self, external_force):
         """
@@ -110,8 +121,13 @@ class DynamicSpring:
 
         init_vel : float
         """
-        self._xi = init_disp
-        self._vm = init_vel
+        self._def = init_disp
+        self._vel = init_vel
+        self._prev_def = init_disp
+        self._prev_vel = init_vel
+
+        acc = self._get_rhs(0) / self._get_lhs()
+        self._prev_mid_vel = init_vel - self._dt / 2 * acc
 
     def _get_external_force(self, time_):
         if callable(self._f_ext):
@@ -131,24 +147,33 @@ class DynamicSpring:
 
     def solve(self, end_time):
         """
-        solves the dynamic system explicitly
+        solves the dynamic system explicitly using second
+        order central difference scheme
 
         Parameters
         ----------
         end_time : float
             end time to terminate the solver
         """
-        self.position.append(self._xi)
-        curr_time = 0
+        curr_time = self._dt
+        t = [0]
+        self._displacement.append(self._def)
         while curr_time <= end_time:
-            curr_time += self._dt
             lhs = self._get_lhs()
             rhs = self._get_rhs(curr_time - self._dt)
             acceleration = rhs / lhs
-            self._vp = self._vm + self._dt * acceleration
-            self._xi += self._dt * self._vp
-            self.position.append(self._xi)
-            self._vm = self._vp
+
+            self._vel = self._prev_mid_vel + self._dt / 2 * acceleration
+            self._mid_vel = self._prev_mid_vel + self._dt * acceleration
+            self._def = self._prev_def + self._dt * self._mid_vel
+
+            self._prev_mid_vel = self._mid_vel
+            self._prev_def = self._def
+
+            curr_time += self._dt
+            self._displacement.append(self._def)
+            t.append(curr_time)
+        return np.array(t)
 
 
 class MassSpring(DynamicSpring):
@@ -170,9 +195,15 @@ class MassSpring(DynamicSpring):
 
     def _get_rhs(self, time_):
         ext_force = self._get_external_force(time_ - self._dt)
-        int_force = self._get_internal_force(self._xi)
+        int_force = self._get_internal_force(self._def)
         rhs = ext_force - int_force
         return rhs
+
+    def solve_analytical(self, x0, v0, end_time):
+        t = np.linspace(0.0, end_time, len(self._displacement), dtype=float)
+        eigen = sqrt(self._k / self._m)
+        y = v0 / eigen * np.sin(eigen * t) + x0 * np.cos(eigen * t)
+        return t, y
 
 
 class MassSpringDamper(MassSpring):
@@ -197,7 +228,7 @@ class MassSpringDamper(MassSpring):
 
     def _get_rhs(self, time_):
         rhs = super()._get_rhs(time_)
-        rhs -= self._c * self._vm
+        rhs -= self._c * self._vel
         return rhs
 
 
@@ -209,21 +240,21 @@ if __name__ == "__main__":
     print(f"x = {SYSTEM.position[0]}")
 
     # == Undamped dynamic spring-mass system
-    SYSTEM = MassSpring(1, 1, 0.05)
-    SYSTEM.set_external_force(0)
-    SYSTEM.set_initial_conditions(-5, 10)
-    SYSTEM.solve(50)
+    SYSTEM = MassSpring(m=1, k=1, dt=0.05)
+    SYSTEM.set_external_force(external_force=0)
+    SYSTEM.set_initial_conditions(init_disp=-5, init_vel=-5)
+    t = SYSTEM.solve_central(end_time=50)
     plt.figure()
-    plt.plot(np.linspace(0, 10, num=len(SYSTEM.position)), SYSTEM.position)
+    plt.plot(t, SYSTEM.deformation)
     plt.grid()
 
     # == Damped dynamic spring-mass system
-    SYSTEM = MassSpringDamper(1, 0.03, lambda x: 1 * sin(x), 0.05)
+    SYSTEM = MassSpringDamper(m=1, c=0.03, k=lambda x: 1.0*sin(x), dt=0.1)
     SYSTEM.set_external_force(lambda t: 3 * cos(4 * t))
-    SYSTEM.set_initial_conditions(1, 0)
-    SYSTEM.solve(60)
+    SYSTEM.set_initial_conditions(init_disp=1, init_vel=0)
+    t = SYSTEM.solve(60)
     plt.figure()
-    plt.plot(np.linspace(0, 60, num=len(SYSTEM.position)), SYSTEM.position)
+    plt.plot(t, SYSTEM.deformation)
     plt.grid()
     plt.xlabel("time")
     plt.ylabel("displacement")
@@ -231,18 +262,16 @@ if __name__ == "__main__":
     TITLE += r"$M=1,~C=0.03,~K=\sin(x),~F=3\cos(x),~x_0=1,v_0=0$"
     plt.title(TITLE)
 
-    plt.show()
-
-    fig, ax = plt.subplots()
-    (line,) = ax.plot([], [], c="black")
-    mass = ax.scatter([0], [0], s=750, c="black")
-    ax.set(xlim=[-1.5, 2.5], ylim=[-1.0, 1.0])
-    plt.axis("off")
-    for deformation in SYSTEM.position:
-        coords = spring([0, 0], [1 + deformation, 0], 12, 0.5)
-        line.set_xdata(coords[0])
-        line.set_ydata(coords[1])
-        mass.set_offsets([1.0 + deformation, 0])
-        plt.pause(0.00000001)
-    ax.set_aspect("equal", "box")
+    # fig, ax = plt.subplots()
+    # (line,) = ax.plot([], [], c="black")
+    # mass = ax.scatter([0], [0], s=750, c="black")
+    # ax.set(xlim=[-1.5, 3.5], ylim=[-1.0, 1.0])
+    # plt.axis("off")
+    # for deform in SYSTEM.deformation:
+    #     coords = spring([0, 0], [2 + deform, 0], 12, 0.5)
+    #     line.set_xdata(coords[0])
+    #     line.set_ydata(coords[1])
+    #     mass.set_offsets([2.0 + deform, 0])
+    #     plt.pause(0.00000001)
+    # ax.set_aspect("equal", "box")
     plt.show()
