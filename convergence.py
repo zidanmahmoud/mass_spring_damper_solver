@@ -15,23 +15,25 @@ def plot_convergence_undamped():
     system = MassSpring(m=1, k=1, dt=0.1)
     analytical = system.solve_analytical(-5, 10)
     for dt in dts:
+        print(f"dt={dt}")
         system = MassSpring(m=1, k=1, dt=dt)
         system.set_initial_conditions(init_disp=-5, init_vel=10)
-        t = system.solve(end_time=1000)
+        t = system.solve(end_time=100)
         y = analytical(t)
         errors.append(np.linalg.norm(y - system.deformation) / np.linalg.norm(y) * 100)
     _convegence_plot(dts, errors, "Convergence for the undamped mass-spring system")
 
 
 def plot_convergence_damped_linear():
-    dts = np.geomspace(0.1, 0.0001, 4)
+    dts = np.geomspace(0.1, 1e-5, 5)
     errors = []
 
-    system_fine = MassSpringDamper(m=1, c=0.1, k=1.0, dt=0.00001)
+    system_fine = MassSpringDamper(m=1, c=0.1, k=1.0, dt=1e-6)
     system_fine.set_initial_conditions(init_disp=1, init_vel=0)
     t_fine = system_fine.solve(60)
     def_fine = system_fine.deformation
     for dt in dts:
+        print(f"dt={dt}")
         system = MassSpringDamper(m=1, c=0.1, k=1.0, dt=dt)
         system.set_initial_conditions(init_disp=1, init_vel=0)
         t = system.solve(60)
@@ -46,15 +48,16 @@ def plot_convergence_damped_linear():
 
 
 def plot_convergence_damped_nonlinear():
-    dts = np.geomspace(0.1, 0.0001, 4)
+    dts = np.geomspace(0.1, 1e-5, 5)
     errors = []
 
-    system_fine = MassSpringDamper(m=1, c=0.03, k=lambda x: 1.0 * sin(x), dt=0.00001)
+    system_fine = MassSpringDamper(m=1, c=0.03, k=lambda x: 1.0 * sin(x), dt=1e-6)
     system_fine.set_external_force(lambda t: 3 * cos(4 * t))
     system_fine.set_initial_conditions(init_disp=1, init_vel=0)
     t_fine = system_fine.solve(60)
     def_fine = system_fine.deformation
     for dt in dts:
+        print(f"dt={dt}")
         system = MassSpringDamper(m=1, c=0.03, k=lambda x: 1.0 * sin(x), dt=dt)
         system.set_external_force(lambda t: 3 * cos(4 * t))
         system.set_initial_conditions(init_disp=1, init_vel=0)
@@ -102,6 +105,6 @@ def show_plots():
 
 if __name__ == "__main__":
     plot_convergence_undamped()
-    plot_convergence_damped_linear()
+    # plot_convergence_damped_linear()
     plot_convergence_damped_nonlinear()
     show_plots()

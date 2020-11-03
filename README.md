@@ -9,6 +9,7 @@ This repo is only for me to understand explicit solvers and to keep it archived 
 ![Figure](figures/sample.png)
 
 ## Order of Convergence
-Undamped|Damped|Damped Non-linear
-:-:|:-:|:-:
-![](figures/conv_und.png)|![](figures/conv_d_l.png)|![](figures/conv_d_nnl.png)
+
+Undamped|Damped Non-linear
+:-:|:-:
+![](figures/conv_und.png)|![](figures/conv_d_nnl.png)

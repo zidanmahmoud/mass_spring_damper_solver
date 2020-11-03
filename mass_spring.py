@@ -245,12 +245,19 @@ if __name__ == "__main__":
     print(f"x = {SYSTEM.position[0]}")
 
     # == Undamped dynamic spring-mass system
-    SYSTEM = MassSpring(m=1, k=1, dt=0.1)
+    SYSTEM = MassSpring(m=1.0, k=1.0, dt=0.25)
     SYSTEM.set_external_force(external_force=0)
-    SYSTEM.set_initial_conditions(init_disp=-5, init_vel=-5)
-    t = SYSTEM.solve(end_time=10)
+    SYSTEM.set_initial_conditions(init_disp=1.0, init_vel=-1.0)
+    t = SYSTEM.solve(end_time=20)
     plt.figure()
-    plt.plot(t, SYSTEM.deformation)
+    plt.plot(t, SYSTEM.deformation, "-o", label=r"$\Delta t=0.1$")
+    plt.plot(t, SYSTEM.solve_analytical(1.0, -1.0)(t), "-", label="Analytical")
+    TITLE = "Undamped spring mass system\n"
+    TITLE += r"$M=1.0,~K=1.0,~F=0,~u_0=1.0,~\dot{u}_0=-1.0$"
+    plt.title(TITLE)
+    plt.xlabel("time")
+    plt.ylabel("displacement")
+    plt.legend()
     plt.grid()
 
     # == Damped dynamic spring-mass system
@@ -263,8 +270,8 @@ if __name__ == "__main__":
     plt.grid()
     plt.xlabel("time")
     plt.ylabel("displacement")
-    TITLE = "Dynamic Damped spring mass system\n"
-    TITLE += r"$M=1,~C=0.03,~K=\sin(x),~F=3\cos(x),~x_0=1,v_0=0$"
+    TITLE = "Damped spring mass system\n"
+    TITLE += r"$M=1.0,~C=0.03,~K=\sin(u),~F=3\cos(t),~u_0=1.0,\dot{u}_0=0$"
     plt.title(TITLE)
 
     # fig, ax = plt.subplots()
